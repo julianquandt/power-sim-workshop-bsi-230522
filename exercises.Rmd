@@ -1,0 +1,307 @@
+---
+title: "Practicals"
+output: html_notebook
+---
+
+# Exercise 1
+
+## A)
+
+Imagine you throw a coin 100 times, what is the power of detecting the unfairness of a coin that lands on heads 55% of the time with an alpha level of .01 (i.e. 1%)?
+Fill in the correct numbers in the `qbinom` and `pbinom` functions below to answer this question.
+
+
+```{r e1a_question}
+
+qbinom(p = NA, size = NA, prob = NA, lower.tail = FALSE)
+pbinom(q = NA, size = NA, prob = NA, lower.tail = FALSE)
+
+```
+
+### Your answer
+
+```{r e1a_answer}
+
+```
+
+
+
+## B)
+
+With the alpha level and sample size from above, with how many tosses does power reach 80%?
+Modify the code below to find the answer.
+
+```{r e1b_question}
+n_tosses <- 10 # we start with an 10 toss experiment
+power_at_n <- c(0) # we make an empty collection of powers for each toss number experiment
+crit_heads <- c(0) # a vector with the critical number of heads at our alpha level at each toss number
+i <- 1 # an index that iterates over the loop
+check_power <- 0 # this is for the loop to see if the desired power is reached and stop if it is
+
+# while pwoer is < .80 run loop again
+while(check_power < .80){
+  # frist we calculate the critical number of heads that occurs with p < alpha
+  # at the coin toss experiment with n_tosses tosses
+  crit_heads[i] <- qbinom(p = .05, size = n_tosses, prob = .50, lower.tail = FALSE)
+  # calculate the proportion of sequences that result in more than crit_heads heads with the unfair coin
+  power_at_n[i] <- pbinom(crit_heads[i], size = n_tosses, prob = .60, lower.tail = FALSE)
+  check_power <- power_at_n[i] # save the check power for the loop
+  # if power is still < .80
+  if(check_power < .80){
+      n_tosses <- n_tosses+1 # increase number of tosses by one
+      i <- i+1 # increase the storage location index for the collection by one
+  }
+}
+```
+
+If you want to, see if you can check your answer in G*Power.
+
+### Your answer
+
+
+```{r e1b_answer}
+
+```
+
+
+## C)
+
+Change the code below to find where there the power to find the group difference would reach 90%.
+
+```{r e1c_question}
+set.seed(1)
+check_power <- 0 # this is for the loop to see if the desired power is reached and stop if it is
+group_size = 30
+power_at_n <- c(0)
+n_sims <- 100
+i <- 1
+while(check_power < .80){
+  
+  p_vals <- c(0)
+  for(j in 1:n_sims){ # for each sample size, how often do we want to repeat the t-test?
+    G1 <- rnorm(group_size, 0, 5) # simulate group 1
+    G2 <- rnorm(group_size, 2, 5) # simulate group 2
+    p_vals[j] <- t.test(G1, G2)$p.value # save p-value of each simulation in a collection
+  }
+  # see how many p-values of he n_sims samples are smaller than a certain alpha value
+  power_at_n[i] <- mean(p_vals < .05) 
+  check_power <- power_at_n[i]
+    if(check_power < .80){
+      group_size <- group_size+1 # increase number of tosses by one
+      i <- i+1 # increase the storage location index for the collection by one
+  }
+  
+}
+```
+
+What is the group size where we reach 90% power? 
+
+### Your Answer
+
+```{r e1c_answer}
+set.seed(1)
+
+```
+
+
+## D)
+
+Now also change the alpha level to .01.
+What is the new sample size?
+
+### Your answer
+
+```{r e1d_answer}
+set.seed(1)
+
+```
+
+## E) 
+
+In the coin tossing example, we always need to check the critical number of heads that is less likely than our alpha level to happen with a fair coin.
+Why do we not do this in the t-test example? Or do we? If so, where in the code does it happen?
+
+### Your answer
+
+
+## F) Bonus Question (difficult)
+
+How would the table of possibilities look like?
+Specifically, in a coin toss each observation would be HEADS or TAILS.
+In this situation, each observation would be a score of a person.
+Imagine we know that the only thing we know is that there is a population with mean = 10 and SD = 2.
+How many rows would a possibility table have of just 2 possible scores of this population?
+Is it even possible to write the table up?
+
+
+### Your answer
+
+
+
+# Exercise 2
+
+## A)
+
+The code below creates a design-matrix of a within-subject experiment measuring 30 participants at two timepoints.
+Can you change the code such that it measures 50 participants at 4 timepoints?
+
+```{r e2a_question}
+
+e2a_data <- data.frame( # we have 60 participants in this design (30 in each group)
+                         participant = rep(1:30, times = 2), 
+                         # we have 2 groups. We assign the first half of participants to G1 and the 2nd half to G2
+                         # note that we use the numbers 0 and 1 here, this is important as we will see
+                         timepoint = rep(0:1, each = 30), 
+                         # for now we fill in the happiness scores with NA
+                         happiness = rep(NA)
+                         )
+e2a_data
+```
+
+### Your answer
+
+```{r e2a_answer}
+
+```
+
+
+## B) 
+
+Can you __add__ a between-subject factor called group to the data above that results in two groups of 25 participants?
+
+
+### Your answer
+
+
+```{r e2b_answer}
+
+```
+
+## C)
+
+With the added between-subject factor in the data, the regression equation that we are working with becomes the following (hover over it with the mouse to be able to see it or click on the preview button to see the rendered document):
+
+
+$happiness_i = \beta_0 + \beta_1*timepoint_i + \beta_2*group_i + \epsilon_i$
+
+Can you add the group factor to the code below, to make sure that happiness depends on the group with a difference of 4 points between the groups?
+
+
+```{r e2c_question}
+
+set.seed(555)
+
+beta0 <- 0 # define beta0 (here it represents the mean of group 1)
+beta1 <- 2 # define beta1 (here it represents the difference between group means of G1 and G2)
+epsilon <- 5 # define the SD of both groups (1 value because we assume equal variance)
+
+
+for(i in 1:nrow(e2b_data)){
+  # for each row the happiness score is defined as 1 draw from a normal distribution with mean defined as:
+  e2b_data$happiness[i] <- rnorm(1, 
+                        beta0 + # mean of group 1 plus
+                        beta1*e2b_data$group[i] # IF a person is in group 2, the difference in group means between G1 and G2
+                        , epsilon # with standard deviation epsilon
+                        )
+}
+e2b_data
+
+```
+
+
+## D)
+
+The data above has a within-subject and a between-subject effect.
+The code below analyzes these data with a mixed-effects model using the `lmer` function.
+Have a look at the output and see if you find the following things in he output:
+
+beta0 = 0
+beta1 = 2
+beta2 = 4
+epsilon = 5
+
+```{r e2d_question}
+m_e2d <- lmer(happiness ~ timepoint+group + (1 | participant), e2b_data)
+summary(m_e2d)
+```
+
+
+### Your answer
+
+
+
+## E) Bonus question (difficult)
+
+The model above shows the warning `boundary (singular) fit: see ?isSingular`.
+Do you know why this might happen in this case?
+_Hint: singularity warnings are often related to the fact that random effects are very small. Is there a small random effect, if so: why is this effect so small?_ 
+
+
+# Exercise 3
+
+## A)
+
+The code below simulates data for 10 participants, who are part of an online class and have to do a knowledge test on 10 different weeks.
+The code below specifies the respective parameters:
+
+
+```{r e3a_question}
+n <- 10 # sample size
+test_times <- 10 # timepoints on which knowledge is tested
+```
+
+Can you simulate the design matrix using `n` and `test_times` in your code?
+
+### Your answer
+
+```{r e3a_answer}
+d_e3a <- data.frame()
+```
+
+## B) 
+
+The test is scored on a 100 point scale.
+The first test happens before the first class so we expect that participants score rather low on it, about 10 points on average.
+We also expect that each week, participants increase, on average, by about 5 points per week.
+We also expect that due to reasons unknown (measurement error, test error, weather, time of day etc.) the test scores will be vary with an SD of 4 points.
+
+```{r e3b_question}
+beta0 <- 10 # average starting point skill
+beta1 <- 5  # increase per week
+epsilon <- 4 # sd of knowledge for unknown reasons
+```
+
+
+We also expect participants to have different levels of knowledge when they start the class.
+Specifically, we expect that the SD of participant's pre-knowledge is about 3 points on the test.
+Can you simulate this random intercept?
+
+### Your answer
+
+```{r e3b_answer}
+u0_participant <- rnorm()
+```
+
+## C)
+
+We also assume that people differ in the speed with which they learn.
+Specifically, the standard deviation in learning speed should be around 1.5 points.
+Can you simulate this random slope?
+
+### Your answer
+
+```{r e3c_answer}
+u1_participant <- rnorm()
+```
+
+
+## D)
+
+Can you use these parameters to fill the `knowledge` column in the data and run a lmer model on them?
+
+### Your answer
+
+```{r e3d_answer}
+set.seed(53434)
+
+```

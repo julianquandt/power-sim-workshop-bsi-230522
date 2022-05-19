@@ -1,0 +1,595 @@
+---
+title: 'Lecture Notes'
+author: "Julian Quandt"
+date: "5/18/2022"
+output: html_notebook
+---
+
+
+# How to calculate power to detect coin Unfairness
+
+We first want to calculate the power to detect a coin unfairness of 60% at an alpha level of .05 with 10 tosses meaning that we only want a 5% chance to claim that a coin that is indeed fair is unfair.
+
+## STEP 1: Calculate what number of heads with a chance < alpha of a fair coin
+
+First we need an answer to the question: What number of heads has a less than 5% chance of occurring with a fair coin?
+We need to know this, as any number of heads smaller than this should not be considered reason to belief that a coin is unfair, as it happens in at least 5% of the sequences.
+Anything that happens __fewer__ than 5% of the times, on the other hand, lets us belief that a coin is not fair.
+
+To do this, we write down all 1024 sequences, and mark the 5% of them (1024*0.05 = 52) with the highest number of heads. Anything __larger than__ the lowest number in this sequence is the answer.
+
+first we make a list with the events that could happen in each toss (heads or tails in each toss)
+
+```{r fair_coin}
+fair_coin_events <- data.frame(replicate(10, 0:1)) # tails = 0 , heads = 1
+fair_coin_events
+```
+
+Now we write down the table with all possible sequences of 10 tosses.
+
+```{r fair_coin_possibilities}
+fair_coin_possibilities <- data.frame(expand.grid(fair_coin_events, 
+                                                  KEEP.OUT.ATTRS = FALSE)) 
+str(fair_coin_possibilities)
+```
+
+The `expand.grid` function here is used to create a table with all possible sequences of 10 tosses.
+It will take each column of the `fair_coin_events` data frame and make a table with all possible combinations of the events there.
+
+Now we search for the lowest number of heads in the highest 5%, i.e. 52 sequences first we calculate the number of heads in each sequence
+
+```{r q_alpha_fair}
+fair_coin_possibilities$n_heads <- rowSums(fair_coin_possibilities)
+sort(fair_coin_possibilities$n_heads, decreasing = TRUE)[1:52]
+```
+
+We can see that the lowest number in the sequence is an 8. 
+This means that any sequence with __more than__ 8 heads has a chance of less than 5% to occur with a fair coin.
+
+Thus, if we toss a coin 10 times and it shows 9 or more heads we would consider it unfair.
+What is our chance of having such a sequence with an unfair coin that lands on HEADS 60% of the time?
+
+# STEP 2: What is the chance of observing more than 8 heads with the unfair coin
+
+We need to apply a little trick here, as the table of possibilities is very different with an unfair coin, we cannot just use the same table with 1024 possibilities.
+
+The trick that we use is: Instead of a coin, we can think of a die with 10 sides where we draw HEADS on 6 of the sides and TAILS on 4.
+Thus, this modified die has a chance of 60% of landing on HEADS.
+As both 6 and 4 can be divided by 2, we can make the job for R easier by using a 5-sided die with 3 sides representing HEADS and 2 sides representing TAILS.
+First we make a list with the events that could happen on each throw of the die (i.e. side 1 until 5)
+
+```{r unfair_coin_events}
+unfair_coin_events <- data.frame(replicate(10, 1:5))
+unfair_coin_events
+```
+
+
+We again use expand.grid as above
+
+```{r unfair_coin_dice}
+unfair_coin_possibilities <- as.list(expand.grid(unfair_coin_events, KEEP.OUT.ATTRS = FALSE)) # this time we save the events in a list first because lists are easier to handle for R and it will be quicker to perform stuff in lists compared to a data.frame
+str(unfair_coin_possibilities)
+```
+
+Now we use the lapply function to tell R that it should replace the numbers 1 and 2 with a 0 indicating tails and 3, 4 and 5 with a 1 indicating heads.
+
+
+```{r transform_dice}
+unfair_coin_possibilities <- lapply(unfair_coin_possibilities, function(x) {
+  x <- ifelse(x %in% c(1, 2), 0, 1)
+})
+unfair_coin_possibilities <- data.frame(unfair_coin_possibilities) # now that we have done the computation-heavy operations we can transform it back to a data-frame
+colnames(unfair_coin_possibilities) <- 1:10 # we also change the column names as they are very long
+str(unfair_coin_possibilities)
+```
+
+It looks very similar to the fair_coin_possibilities but by checking the average number of heads in a column (i.e. 1 toss of a sequence) we can see if our coin is indeed unfair with 60% chance of heads.
+
+```{r calculate_colmean}
+colMeans(unfair_coin_possibilities[1])
+```
+
+The column mean of the first column is 0.6, which means that the coin is unfair with 60% chance of heads.
+Now we only have to see what the chance is to actually observe more than 8 heads with this unfair coin.
+We can do this by taking the sum of each row (the sum of how many 1 there are in each row indicating how many heads there are in the sequence).
+By taking the mean of this sum, we see how many sequences have more than 8 heads like this:
+
+```{r calculate_power}
+mean(rowSums(unfair_coin_possibilities) > 8)
+```
+
+
+# The easy way
+
+## Step 1:
+
+```{r easy_step1}
+qbinom(p = .05, size = 10, prob = .5, lower.tail = FALSE)
+```
+
+* p = What is the probability that we are interested in? 
+* size = total number of coin tosses
+* Prob = hypothesized probability of landing on HEADS of this coin
+* lower.tail = FALSE indicates we want to investigate the highest 5 percent of the possibility table
+
+
+## Step 2:
+
+```{r easy_step2}
+pbinom(q = 8, size = 10, prob = .6, lower.tail = FALSE)
+```
+
+* q = quantity (i.e. number of heads) we are interested in 
+* size = total number of coin tosses
+* Prob = hypothesized probability of landing on HEADS of this coin
+* lower.tail = FALSE indicates we want to investigate the chance of getting more than 8 HEADS
+
+
+# When does the power reach 80%
+
+```{r power_calculation_cointoss}
+n_tosses <- 10 # we start with an 10 toss experiment
+power_at_n <- c(0) # we make an empty collection of powers for each toss number experiment
+crit_heads <- c(0) # a vector with the critical number of heads at our alpha level at each toss number
+i <- 1 # an index that iterates over the loop
+check_power <- 0 # this is for the loop to see if the desired power is reached and stop if it is
+
+# while pwoer is < .80 run loop again
+while(check_power < .80){
+  # frist we calculate the critical number of heads that occurs with p < alpha
+  # at the coin toss experiment with n_tosses tosses
+  crit_heads[i] <- qbinom(p = .05, size = n_tosses, prob = .50, lower.tail = FALSE)
+  # calculate the proportion of sequences that result in more than crit_heads heads with the unfair coin
+  power_at_n[i] <- pbinom(crit_heads[i], size = n_tosses, prob = .60, lower.tail = FALSE)
+  check_power <- power_at_n[i] # save the check power for the loop
+  # if power is still < .80
+  if(check_power < .80){
+      n_tosses <- n_tosses+1 # increase number of tosses by one
+      i <- i+1 # increase the storage location index for the collection by one
+  }
+}
+```
+
+We can now see where our power reached 80% by looking at the last value that `n_tosses` got in the loop
+
+```{r power_80_cointoss}
+n_tosses
+```
+Thus, at 158 tosses we reach a power of 80% to detect a coin unfairness of 60% at an alpha level of .05.
+
+We can also plot the power curve to see how power changes with increasing sample size.
+
+```{r plot_power_cointoss}
+
+plot(10:(n_tosses), power_at_n, xlab = "Number of coin-tosses", ylab = "Power", axes = FALSE, ylim = c(0,1))
+abline(h = .80, col = "red")
+axis(side = 1, at = seq(10,(n_tosses+20),by=10))
+axis(side = 2, at = seq(0,1,by=0.1))
+```
+# Power simulation in R
+
+```{r set_seed_sim10}
+set.seed(1234) # this way we can make the simulation reproducible
+```
+
+Lets see how we can simulate the power for a coin toss experiment with 158 tosses that yielded the 80% power above.
+With the 
+
+```{r power_sim_1}
+rbinom(1, 158, .6)
+
+```
+
+If we increase the first number, we can tell R to do more of these experiments
+
+
+```{r power_sim_100}
+simulated_tosses <- rbinom(100, 158, .6)
+simulated_tosses # this gives us the number of heads
+```
+
+By checking how many of these surpass the critical value of heads for 158 tosses, we get the power.
+
+```{r power_from_sim_10}
+mean(simulated_tosses > 89)
+```
+
+We get a power of .79 here which is close to the 80 percent of the power above. 
+
+We could repeat this simulation and get a different result:
+
+```{r power_sim_100_nr2}
+simulated_tosses <- rbinom(100, 158, .6)
+mean(simulated_tosses > 89)
+```
+
+By increasing the number of experiments that we run, it will get ever so closer to the calculated result which was 0.80565494.
+
+
+```{r power_sim_100000}
+simulated_tosses <- rbinom(1000000, 158, .6)
+mean(simulated_tosses > 89)
+```
+
+We can also use a power simulation to find the sample size for the problem above
+
+```{r power_simulation_cointoss}
+n_tosses_simulated <- 10 # we start with an 10 toss experiment
+power_at_n_simulated <- c(0) # we make an empty collection of powers for each toss number experiment
+crit_heads_simulated <- c(0) # a vector with the critical number of heads at our alpha level at each toss number
+i <- 1 # an index that iterates over the loop
+check_power <- 0 # this is for the loop to see if the desired power is reached and stop if it is
+
+# while pwoer is < .80 run loop again
+while(check_power < .80){
+  # frist we calculate the critical number of heads that occurs with p < alpha
+  # at the coin toss experiment with n_tosses tosses
+  crit_heads_simulated[i] <- qbinom(p = .05, size = n_tosses_simulated, prob = .50, lower.tail = FALSE)
+  # calculate the proportion of sequences that result in more than crit_heads heads with the unfair coin
+  power_at_n[i] <- mean(rbinom(100, n_tosses_simulated, .6) > crit_heads_simulated[i])
+  check_power <- power_at_n[i] # save the check power for the loop
+  # if power is still < .80
+  if(check_power < .80){
+      n_tosses_simulated <- n_tosses_simulated+1 # increase number of tosses by one
+      i <- i+1 # increase the storage location index for the collection by one
+  }
+}
+max(n_tosses_simulated)
+```
+
+The loop stopped at a slightly different number, which is due to simulation noise. 
+If we increased the simulations per sample size, we would get a closer number.
+
+
+# Simulate a t-test
+
+```{r set_seed_ttest}
+set.seed(124)
+```
+
+```{r sim_groups_ttest}
+G1 <- rnorm(30, 0, 5)
+G2 <- rnorm(30, 2, 5)
+t.test(G1, G2, var.equal = TRUE)
+```
+
+We can easily make this a power simulation by putting it in a loop and changing group size
+
+
+```{r power_ttest1}
+check_power <- 0 # this is for the loop to see if the desired power is reached and stop if it is
+group_size = 30
+power_at_n <- c(0)
+n_sims <- 100
+i <- 1
+while(check_power < .80){
+  
+  p_vals <- c(0)
+  for(j in 1:n_sims){ # for each sample size, how often do we want to repeat the t-test?
+    G1 <- rnorm(group_size, 0, 5) # simulate group 1
+    G2 <- rnorm(group_size, 2, 5) # simulate group 2
+    p_vals[j] <- t.test(G1, G2)$p.value # save p-value of each simulation in a collection
+  }
+  # see how many p-values of he n_sims samples are smaller than a certain alpha value
+  power_at_n[i] <- mean(p_vals < .05) 
+  check_power <- power_at_n[i]
+    if(check_power < .80){
+      group_size <- group_size+1 # increase number of tosses by one
+      i <- i+1 # increase the storage location index for the collection by one
+  }
+}
+group_size
+```
+
+The code above is similar to the code that we used previously for the coin tossing experiments.
+This time, we use a t-test to compare the group sizes and save the p-value for each simulation.
+By checking the proportion of p-values smaller than our alpha-level we get the power at the respective sample size.
+
+# Simulate t-test as linear model
+
+When simulating a linear model, it is often useful to start with the _design matrix_, a data-frame that holds all relevant variables that we include in our model.
+
+
+```{r make_linmod_data}
+
+group_data <- data.frame( # we have 60 participants in this design (30 in each group)
+                         participant = 1:60, 
+                         # we have 2 groups. We assign the first half of participants to G1 and the 2nd half to G2
+                         # note that we use the numbers 0 and 1 here, this is important as we will see
+                         group = rep(0:1, each = 30), 
+                         # for now we fill in the happiness scores with NA
+                         happiness = rep(NA)
+                         )
+
+group_data
+```
+Now we can define the parameters that we need for the regression equation:
+
+$happiness_i = \beta_0 + \beta_1*group_i + \epsilon_i$
+
+We already said that:
+
+* $\beta_0$ should be the mean of G1
+* $\beta_1$ should be the difference between G1 and G2 from the perspective of group 2 (+2)
+* $\epsilon_i$ is the error depending on the standard deviation of the normal distribution that we use
+
+Thus we get:
+
+$happiness_i = 0 + 2*group_i + \epsilon_i$
+
+Now we see why we used 0 and 1 as indicator for the groups above.
+For instance, if we fill in this formula for the first participant belonging to G1, we get:
+
+
+$happiness_1 = 0 + 2*0 + \epsilon_1$ = $happiness_1 = 0 + \epsilon_1$
+
+If we look at participant 31, the first in G2, we get:
+
+$happiness_31 = 0 + 2*1 + \epsilon_31$ = $happiness_31 = 0 + 2 + \epsilon_31$
+
+So the only thing left to do is to define the parameters in R and use a loop to calculate the happiness score in each row of the data.
+
+```{r sim_groups_ttest_lm}
+set.seed(124)
+
+beta0 <- 0 # define beta0 (here it represents the mean of group 1)
+beta1 <- 2 # define beta1 (here it represents the difference between group means of G1 and G2)
+epsilon <- 5 # define the SD of both groups (1 value because we assume equal variance)
+
+
+for(i in 1:nrow(group_data)){
+  # for each row the happiness score is defined as 1 draw from a normal distribution with mean defined as:
+  group_data$happiness[i] <- rnorm(1, 
+                        beta0 + # mean of group 1 plus
+                        beta1*group_data$group[i] # IF a person is in group 2, the difference in group means between G1 and G2
+                        , epsilon # with standard deviation epsilon
+                        )
+}
+group_data
+```
+
+
+We used the same simulation seed as above in the 2-sample t-test and should therefore get the same p-value. 
+Let's see if that's the case:
+
+```{r lm_group_data1}
+# analze with a linear model to compare to the t-test
+summary(lm(happiness ~ group, data = group_data))
+```
+
+We can see that the p-value is exactly the same as for the t-test above.
+
+
+# Simulating a random intercept
+
+In Exercise 2c, we generated data accoring to the following model:
+
+$happiness_i = \beta_0 + \beta_1*timepoint_i + \beta_2*group_i + \epsilon_i$
+
+The linear model with the random intercept will look like this.
+
+$happiness_i = \beta_0 + u_{0j} + \beta_1*timepoint_i + \beta_2*group_i + \epsilon_i$
+
+What we need to do now is to simulate a random deviation for each participant:
+Each participant gets exactly _one_ additional value representing the variation from the population mean that can be attributed to idiosyncratic, but unknown attributes related to the participant.
+
+First, this is the data again, where we had 4 timepoints per participant and 2 groups in a between-subject factor:
+
+```{r ri_participant}
+ri_data <- data.frame( # we have 60 participants in this design (30 in each group)
+                         participant = rep(1:50, times = 4), 
+                         # we have 2 groups. We assign the first half of participants to G1 and the 2nd half to G2
+                         # note that we use the numbers 0 and 1 here, this is important as we will see
+                         timepoint = rep(0:3, each = 50), 
+                         group = rep(0:1, each = 25, times = 8), 
+                         # for now we fill in the happiness scores with NA
+                         happiness = rep(NA)
+                         )
+ri_data
+```
+
+Now we can add the parameters again, including the random intercept
+
+
+```{r add_params}
+beta0 <- 0 # define beta0 (here it represents the mean of group 1)
+beta1 <- 2 # define beta1 (here it represents the difference between group means of G1 and G2)
+beta2 <- 4 # define beta1 (here it represents the difference between group means of G1 and G2)
+epsilon <- 5 # define the SD of both groups (1 value because we assume equal variance)
+
+set.seed(1325)
+# we simulate the random intercept sd from a normal distribution
+u0_participant <- rnorm(# the size is the number of participants
+                        n = length(unique(ri_data$participant)),
+                        # the mean is always zero, as we are estimating a standard deviation here!
+                        mean = 0, 
+                        # and now we fill in the random intercept size that we want to simulate 
+                        # as the standard deviation of the normal distribution
+                        sd = 10)
+u0_participant
+```
+We can see that we got a vector of length 50, as the data has 50 participants. 
+Now we can go back to simulating the happiness scores and for each row, we will see which participant the row "belongs to" and add their respective simulated participant-related SD to the happiness score.
+This means that for each row, we have to check which participant nr. is in the respective row.
+For example we can do this running:
+
+```{r firstrow_ppnr}
+
+e2b_data$participant[1] # first row
+e2b_data$participant[30] # 30th row
+e2b_data$participant[80] # 80th row
+
+
+```
+We see that the participant nr. in row 1 is 1,
+Rows 30 and 80 both belong to participant 30 as row 80 is the 2nd timepoint for participant 30.
+
+To get the value of the random intercept for the participant in row 80 (i.e. participant 30) we can run:
+
+```{r ri_row80}
+
+u0_participant[e2b_data$participant[80]] # 80th row
+```
+
+which, if we check the vector from above, is indeed the 30th element of the random intercept vector.
+Using this code, we can simulate the happiness scores this way:
+
+```{r sim_dv_with_ri}
+set.seed(555)
+for(i in 1:nrow(ri_data)){
+  # for each row the happiness score is defined as 1 draw from a normal distribution with mean defined as:
+  ri_data$happiness[i] <- rnorm(1, 
+                        beta0 + 
+                        u0_participant[ri_data$participant[i]] + 
+                        beta1*ri_data$timepoint[i] + # IF timepoint is 1 its 0 otherwise beta1
+                        beta2*ri_data$group[i] # IF G1 its 0 otherwise beta2
+                        , epsilon # with standard deviation epsilon
+                        )
+}
+ri_data
+
+```
+
+Ok, lets see if it worked.
+
+```{r sim_lmer1}
+library(lme4)
+library(afex)
+lmer1 <- mixed(happiness ~ timepoint + group + (1 | participant), data = ri_data, method = "S")
+summary(lmer1)
+```
+
+Indeed, we can see that he random intercept for participants is 10!
+
+# Simulating a random slope
+
+
+If we simulate a random slope, we mean to say that the effect size of the within-subject effect depends on the participant.
+Some might be more and some might be less susceptible to the effect, but we are assuming that this is not random variance but can be attributed to participants reacting differently towards the effect, the causes for which are unknown.
+The random slope is added on top of the fixed effect of time such the sum of both is then multiplied by the timepoint in the specific row.
+
+$happiness_i = \beta_0 + u_{0j} + (\beta_1+u_{1j})*timepoint_i + \beta_2*group_i + \epsilon_i$
+
+
+```{r sim_rs}
+set.seed(53434)
+u1_participant <- rnorm(# the size is the number of participants
+                        n = length(unique(ri_data$participant)),
+                        # the mean is always zero, as we are estimating a standard deviation here!
+                        mean = 0, 
+                        # and now we fill in the random intercept size that we want to simulate 
+                        # as the standard deviation of the normal distribution
+                        sd = 3)
+
+set.seed(555)
+for(i in 1:nrow(ri_data)){
+  # for each row the happiness score is defined as 1 draw from a normal distribution with mean defined as:
+  ri_data$happiness[i] <- rnorm(1, 
+                        beta0 + 
+                        u0_participant[ri_data$participant[i]] + 
+                        (beta1+u1_participant[ri_data$participant[i]])*ri_data$timepoint[i] + # IF timepoint is 1 its 0 otherwise beta1+random slope
+                        beta2*ri_data$group[i] # IF G1 its 0 otherwise beta2
+                        , epsilon # with standard deviation epsilon
+                        )
+}
+ri_data
+
+```
+
+
+
+```{r sim_lmer2}
+lmer2 <- mixed(happiness ~ timepoint + group + (1 + timepoint | participant), data = ri_data, method = "S")
+summary(lmer2)
+```
+
+Lets put this in a power simulation.
+To do this, we combine the design-matrix code, the DV simulation and the lmer fitting into one loop, similar to what we did in the t-test situation.
+
+
+```{r lmer_powersim}
+############# This is stuff that only needs to be specified once because it stays constant across simulations OR is changed within the loop automatically ###############
+set.seed(094984)
+check_power <- 0 # this is for the loop to see if the desired power is reached and stop if it is
+n = 50 # total sample size always needs to be divisible by number of between subject groups!
+power_at_n_timepoint <- c(0)
+power_at_n_group <- c(0)
+n_sims <- 10 # 10 simulations only to save time
+i <- 1
+
+beta0 <- 0 # define beta0 (here it represents the mean of group 1)
+beta1 <- 2 # define beta1 (here it represents the difference between group means of G1 and G2)
+beta2 <- 4 # define beta1 (here it represents the difference between group means of G1 and G2)
+epsilon <- 5 # define the SD of both groups (1 value because we assume equal variance)
+
+
+while(check_power < .80){
+
+############# This is stuff that needs to change whenever we increase sample size ###############
+
+  p_vals_time <- c(0)
+  p_vals_group <- c(0)
+  
+  # adjust sample size for next set of simulations by making new design matrix
+  sim_data <- data.frame( # we have n participants in this design
+                         participant = rep(1:n, times = 4), 
+                         # we have 4 timepoints here
+                         timepoint = rep(0:3, each = n), 
+                         # we have 2 groups
+                         group = rep(0:1, each = (n/2), times = 8), 
+                         # for now we fill in the happiness scores with NA
+                         happiness = rep(NA)
+                         )
+  
+  
+  for(j in 1:n_sims){ 
+    
+    ############# This is stuff that needs to change for every single simulation ###############
+
+    
+    # simulate new parameter values for the random effects on each simulation
+    u0_participant <- rnorm(# the size is the number of participants
+                          n = length(unique(sim_data$participant)),
+                          # the mean is always zero, as we are estimating a standard deviation here!
+                          mean = 0, 
+                          # and now we fill in the random intercept size that we want to simulate 
+                          # as the standard deviation of the normal distribution
+                          sd = 10)
+    u1_participant <- rnorm(# the size is the number of participants
+                          n = length(unique(sim_data$participant)),
+                          # the mean is always zero, as we are estimating a standard deviation here!
+                          mean = 0, 
+                          # and now we fill in the random intercept size that we want to simulate 
+                          # as the standard deviation of the normal distribution
+                          sd = 3)
+    
+    for(k in 1:nrow(sim_data)){
+      sim_data$happiness[k] <- rnorm(1, 
+                  beta0 + 
+                  u0_participant[sim_data$participant[k]] + 
+                  (beta1+u1_participant[sim_data$participant[k]])*sim_data$timepoint[k] + # IF timepoint is 1 its 0 otherwise beta1+random slope
+                  beta2*sim_data$group[k] # IF G1 its 0 otherwise beta2
+                  , epsilon # with standard deviation epsilon
+                  )
+    }
+    
+    #next we fit the model. We add supressMessages() here and progress = F to not have fitting messages printed, which would slow down the process a lot
+    m_sim <- suppressMessages(mixed(happiness ~ timepoint + group + (1 + timepoint | participant), data = sim_data, method = "S", progress = F))
+    p_vals_time[j] <- m_sim$anova_table$`Pr(>F)`[1] # first p-value in m_sim will be about timepoint
+    p_vals_group[j] <- m_sim$anova_table$`Pr(>F)`[2] # second p-value in m_sim will be about group
+  }
+  # see how many p-values of he n_sims samples are smaller than a certain alpha value
+  # note that we check the p-values of both effects here and wait until both are significant 
+  power_at_n_timepoint[i] <- mean(p_vals_time < .05) 
+  power_at_n_group[i] <- mean(p_vals_group < .05) 
+  # if either effect is still insignificant, continue
+  check_power <- min(power_at_n_timepoint[i], power_at_n_group[i])
+  if(check_power < .80){
+      n <- n+20 # increaes n by 10 in each iteration to save some time and to always make it divisible by 2
+      i <- i+1 # increase the storage location index for the collection by one
+  }
+}
+n
+```
+
+We reach a power of 80% at 110 participants.

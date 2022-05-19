@@ -1,0 +1,245 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+# Exercise 1
+
+## A)
+
+```{r e1a_answer}
+
+qbinom(p = .01, size = 100, prob = .50, lower.tail = FALSE)
+pbinom(q = 62, size = 100, prob = .55, lower.tail = FALSE)
+
+```
+
+## B)
+
+
+```{r e1b_answer}
+n_tosses <- 100 # we start with an 10 toss experiment
+power_at_n <- c(0) # we make an empty collection of powers for each toss number experiment
+crit_heads <- c(0) # a vector with the critical number of heads at our alpha level at each toss number
+i <- 1 # an index that iterates over the loop
+check_power <- 0 # this is for the loop to see if the desired power is reached and stop if it is
+
+# while pwoer is < .80 run loop again
+while(check_power < .80){
+  # frist we calculate the critical number of heads that occurs with p < alpha
+  # at the coin toss experiment with n_tosses tosses
+  crit_heads[i] <- qbinom(p = .01, size = n_tosses, prob = .50, lower.tail = FALSE)
+  # calculate the proportion of sequences that result in more than crit_heads heads with the unfair coin
+  power_at_n[i] <- pbinom(crit_heads[i], size = n_tosses, prob = .55, lower.tail = FALSE)
+  check_power <- power_at_n[i] # save the check power for the loop
+  # if power is still < .80
+  if(check_power < .80){
+      n_tosses <- n_tosses+1 # increase number of tosses by one
+      i <- i+1 # increase the storage location index for the collection by one
+  }
+}
+n_tosses
+```
+
+## C)
+
+
+```{r e1c_answer}
+set.seed(1)
+check_power <- 0 # this is for the loop to see if the desired power is reached and stop if it is
+group_size = 30
+power_at_n <- c(0)
+n_sims <- 100
+i <- 1
+
+
+while(check_power < .90){
+  
+  p_vals <- c(0)
+  for(j in 1:n_sims){ # for each sample size, how often do we want to repeat the t-test?
+    G1 <- rnorm(group_size, 0, 5) # simulate group 1
+    G2 <- rnorm(group_size, 2, 5) # simulate group 2
+    p_vals[j] <- t.test(G1, G2)$p.value # save p-value of each simulation in a collection
+  }
+  # see how many p-values of he n_sims samples are smaller than a certain alpha value
+  power_at_n[i] <- mean(p_vals < .05) 
+  check_power <- power_at_n[i]
+    if(check_power < .90){
+      group_size <- group_size+1 # increase number of tosses by one
+      i <- i+1 # increase the storage location index for the collection by one
+  }
+  
+}
+group_size
+```
+
+
+
+## D) 
+
+
+```{r e1d_answer}
+set.seed(1)
+check_power <- 0 # this is for the loop to see if the desired power is reached and stop if it is
+group_size = 30
+power_at_n <- c(0)
+n_sims <- 100
+i <- 1
+
+
+while(check_power < .90){
+  
+  p_vals <- c(0)
+  for(j in 1:n_sims){ # for each sample size, how often do we want to repeat the t-test?
+    G1 <- rnorm(group_size, 0, 5) # simulate group 1
+    G2 <- rnorm(group_size, 2, 5) # simulate group 2
+    p_vals[j] <- t.test(G1, G2)$p.value # save p-value of each simulation in a collection
+  }
+  # see how many p-values of he n_sims samples are smaller than a certain alpha value
+  power_at_n[i] <- mean(p_vals < .01) 
+  check_power <- power_at_n[i]
+    if(check_power < .90){
+      group_size <- group_size+1 # increase number of tosses by one
+      i <- i+1 # increase the storage location index for the collection by one
+  }
+  
+}
+group_size
+```
+
+
+## E)
+
+We do not have to do this explicitly as the t.test function does provide us with a p-value that checks the group difference against the critical value that is, in case of a t-test, taken from the respective t-distribution with the respective degrees of freedom.
+
+
+## F) 
+
+There are infinitely many possibilities if all we know of the population is the mean and standard deviation.
+As normal distributions are unbound between negative and positive infinity, we could get any real score if we draw a sample - in this case we cannot write up the table of possibilities easily.
+What we could do is make a table for different ranges of values, e.g. what is the chance to get a value between < -10, what is the chance of getting -10 to 0, 0 to 10 etc.
+For instance, a table where make an interval for numbers smaller than the mean, and an interval for numbers larger than the mean would have 2 possibilities per person and therefore 2^2 = 4 rows.
+By making intervals like that, we could make a possibility table, but note that by making the intervals smaller we could make the table have as many rows as we want up to infinity, where ironically the size of each of these bins would be 0 and therefore every precise score would have a probability of exactly zero to occur.
+This possibly counterintuitive and complex matter notwithstanding, we can still just simulate rows of the table using a simulation function - just as we could simulate single rows of the coin tossing table without having to write it all up.
+
+
+# Exercise 2
+
+## A)
+
+```{r e2a_answer}
+e2a_data <- data.frame( # we have 60 participants in this design (30 in each group)
+                         participant = rep(1:50, times = 4), 
+                         # we have 2 groups. We assign the first half of participants to G1 and the 2nd half to G2
+                         # note that we use the numbers 0 and 1 here, this is important as we will see
+                         timepoint = rep(0:3, each = 50), 
+                         # for now we fill in the happiness scores with NA
+                         happiness = rep(NA)
+                         )
+e2a_data
+```
+
+
+## B)
+
+```{r e2b_answer}
+e2b_data <- data.frame( # we have 60 participants in this design (30 in each group)
+                         participant = rep(1:50, times = 4), 
+                         # we have 2 groups. We assign the first half of participants to G1 and the 2nd half to G2
+                         # note that we use the numbers 0 and 1 here, this is important as we will see
+                         timepoint = rep(0:3, each = 50), 
+                         group = rep(0:1, each = 25, times = 8), 
+                         # for now we fill in the happiness scores with NA
+                         happiness = rep(NA)
+                         )
+e2b_data
+```
+
+## C)
+
+```{r e2c_answer}
+set.seed(555)
+
+beta0 <- 0 # define beta0 (here it represents the mean of group 1)
+beta1 <- 2 # define beta1 (here it represents the difference between group means of G1 and G2)
+beta2 <- 4 # define beta1 (here it represents the difference between group means of G1 and G2)
+epsilon <- 5 # define the SD of both groups (1 value because we assume equal variance)
+
+
+for(i in 1:nrow(e2b_data)){
+  # for each row the happiness score is defined as 1 draw from a normal distribution with mean defined as:
+  e2b_data$happiness[i] <- rnorm(1, 
+                        beta0 + 
+                        beta1*e2b_data$timepoint[i] + # IF timepoint is 1 its 0 otherwise beta1
+                        beta2*e2b_data$group[i] # IF G1 its 0 otherwise beta2
+                        , epsilon # with standard deviation epsilon
+                        )
+}
+e2b_data
+
+```
+
+## D)
+
+beta0 = 0: Estimate of (Intercept)
+beta1 = 2: Estimate of timepoint
+beta2 = 4: Estimate of group
+epsilon = 5: Random effect of Residual
+
+```{r e2d_question}
+m_e2d <- lmer(happiness ~ timepoint+group + (1 | participant), e2b_data)
+summary(m_e2d)
+```
+
+
+
+## E) Bonus question (difficult)
+
+The random effect for participant is 0 according to the model output.
+This is no surprise as we did not simulate any random effect across participants in the model.
+We will see how to do this next.
+
+
+# Exercise 3
+
+## A)
+
+```{r e3a_answer}
+n <- 10 # sample size
+test_times <- 10 # timepoints on which knowledge is tested
+beta0 <- 10 # average starting point skill
+beta1 <- 5 # increase per week
+epsilon <- 4
+d_e3a <- data.frame(participant =rep(1:n, times = test_times),
+                    timepoint = rep(1:test_times, each = n),
+                    knowledge = NA)
+```
+
+## B) 
+
+```{r e3b_answer}
+u0_participant <- rnorm(n, 0, 3)
+```
+
+
+## C)
+
+
+```{r e3c_answer}
+u1_participant <- rnorm(n, 0, 1.5)
+```
+
+## D)
+
+
+```{r e3d_answer}
+set.seed(53434)
+for(i in 1:nrow(d_e3a)){
+  d_e3a$knowledge[i] <- rnorm(1, beta0+u0_participant[d_e3a$participant[i]]+(beta1+u1_participant[d_e3a$participant[i]])*d_e3a$timepoint[i], epsilon)
+}
+
+summary(lmer(knowledge ~ timepoint + (1 + timepoint | participant), d_e3a))
+
+```
+
