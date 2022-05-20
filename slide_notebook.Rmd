@@ -10,7 +10,7 @@ output: html_notebook
 
 We first want to calculate the power to detect a coin unfairness of 60% at an alpha level of .05 with 10 tosses meaning that we only want a 5% chance to claim that a coin that is indeed fair is unfair.
 
-## STEP 1: Calculate what number of heads with a chance < alpha of a fair coin
+## STEP 1: Calculate what number of heads with a chance < 5% with a fair coin
 
 First we need an answer to the question: What number of heads has a less than 5% chance of occurring with a fair coin?
 We need to know this, as any number of heads smaller than this should not be considered reason to belief that a coin is unfair, as it happens in at least 5% of the sequences.
@@ -21,7 +21,7 @@ To do this, we write down all 1024 sequences, and mark the 5% of them (1024*0.05
 first we make a list with the events that could happen in each toss (heads or tails in each toss)
 
 ```{r fair_coin}
-fair_coin_events <- data.frame(replicate(10, 0:1)) # tails = 0 , heads = 1
+fair_coin_events <- data.frame(toss_nr = replicate(10, 0:1)) # tails = 0 , heads = 1
 fair_coin_events
 ```
 
@@ -103,8 +103,14 @@ mean(rowSums(unfair_coin_possibilities) > 8)
 
 ## Step 1:
 
+The qbinom function returns the quantity (q) that happens in a binomial event with a given probability
+
 ```{r easy_step1}
-qbinom(p = .05, size = 10, prob = .5, lower.tail = FALSE)
+qbinom(p = .05, # What is the probability that we are interested in (alpha level)
+       size = 10, # total number of coin tosses
+       prob = .5, # hypothesized probability of landing on HEADS of this coin
+       lower.tail = FALSE #indicates we want to investigate the highest 5 percent of the possibility table
+       )
 ```
 
 * p = What is the probability that we are interested in? 
@@ -115,8 +121,14 @@ qbinom(p = .05, size = 10, prob = .5, lower.tail = FALSE)
 
 ## Step 2:
 
+The pbinom function returns the probability (p) of a given quantity being observed in a binomial event
+
 ```{r easy_step2}
-pbinom(q = 8, size = 10, prob = .6, lower.tail = FALSE)
+pbinom(q = 8, # quantity (i.e. number of heads) we are interested in 
+       size = 10, # total number of coin tosses
+       prob = .6, # hypothesized probability of landing on HEADS of this coin
+       lower.tail = FALSE
+       )
 ```
 
 * q = quantity (i.e. number of heads) we are interested in 
@@ -166,6 +178,8 @@ abline(h = .80, col = "red")
 axis(side = 1, at = seq(10,(n_tosses+20),by=10))
 axis(side = 2, at = seq(0,1,by=0.1))
 ```
+
+
 # Power simulation in R
 
 ```{r set_seed_sim10}
@@ -274,7 +288,7 @@ while(check_power < .80){
   power_at_n[i] <- mean(p_vals < .05) 
   check_power <- power_at_n[i]
     if(check_power < .80){
-      group_size <- group_size+1 # increase number of tosses by one
+      group_size <- group_size+1 # increase group size by one
       i <- i+1 # increase the storage location index for the collection by one
   }
 }
@@ -325,7 +339,7 @@ $happiness_1 = 0 + 2*0 + \epsilon_1$ = $happiness_1 = 0 + \epsilon_1$
 
 If we look at participant 31, the first in G2, we get:
 
-$happiness_31 = 0 + 2*1 + \epsilon_31$ = $happiness_31 = 0 + 2 + \epsilon_31$
+$happiness_{31} = 0 + 2*1 + \epsilon_{31}$ = $happiness_{31} = 0 + 2 + \epsilon_{31}$
 
 So the only thing left to do is to define the parameters in R and use a loop to calculate the happiness score in each row of the data.
 
@@ -339,15 +353,22 @@ epsilon <- 5 # define the SD of both groups (1 value because we assume equal var
 
 for(i in 1:nrow(group_data)){
   # for each row the happiness score is defined as 1 draw from a normal distribution with mean defined as:
-  group_data$happiness[i] <- rnorm(1, 
-                        beta0 + # mean of group 1 plus
-                        beta1*group_data$group[i] # IF a person is in group 2, the difference in group means between G1 and G2
-                        , epsilon # with standard deviation epsilon
-                        )
+  group_data$happiness[i] <- rnorm(n = 1, 
+                                    mean = (
+                                    beta0 + # mean of group 1 plus
+                                    beta1*group_data$group[i] # IF a person is in group 2, the difference in group means between G1 and G2
+                                    ) 
+                                    , sd = epsilon # with standard deviation epsilon
+                                    )
 }
 group_data
 ```
+Lets have a look at the group means:
 
+```{r group_means_sim1}
+mean(group_data$happiness[which(group_data$group == 0)])
+mean(group_data$happiness[which(group_data$group == 1)])
+```
 
 We used the same simulation seed as above in the 2-sample t-test and should therefore get the same p-value. 
 Let's see if that's the case:
@@ -408,6 +429,7 @@ u0_participant <- rnorm(# the size is the number of participants
                         sd = 10)
 u0_participant
 ```
+
 We can see that we got a vector of length 50, as the data has 50 participants. 
 Now we can go back to simulating the happiness scores and for each row, we will see which participant the row "belongs to" and add their respective simulated participant-related SD to the happiness score.
 This means that for each row, we have to check which participant nr. is in the respective row.
@@ -503,9 +525,10 @@ lmer2 <- mixed(happiness ~ timepoint + group + (1 + timepoint | participant), da
 summary(lmer2)
 ```
 
+# Mixed-effects model power simulation
+
 Lets put this in a power simulation.
 To do this, we combine the design-matrix code, the DV simulation and the lmer fitting into one loop, similar to what we did in the t-test situation.
-
 
 ```{r lmer_powersim}
 ############# This is stuff that only needs to be specified once because it stays constant across simulations OR is changed within the loop automatically ###############

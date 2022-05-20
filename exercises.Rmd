@@ -66,7 +66,8 @@ If you want to, see if you can check your answer in G*Power.
 
 ## C)
 
-Change the code below to find where there the power to find the group difference would reach 90%.
+If you run the code below, it will simulate when the power to detect the simulated group difference would become 80%. 
+Can you change it so the code instead simulates when the power would reach 90%.
 
 ```{r e1c_question}
 set.seed(1)
@@ -87,7 +88,7 @@ while(check_power < .80){
   power_at_n[i] <- mean(p_vals < .05) 
   check_power <- power_at_n[i]
     if(check_power < .80){
-      group_size <- group_size+1 # increase number of tosses by one
+      group_size <- group_size+1 # increase group size by 1
       i <- i+1 # increase the storage location index for the collection by one
   }
   
