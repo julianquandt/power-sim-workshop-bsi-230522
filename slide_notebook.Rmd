@@ -121,7 +121,7 @@ qbinom(p = .05, # What is the probability that we are interested in (alpha level
 
 ## Step 2:
 
-The pbinom function returns the probability (p) of a given quantity being observed in a binomial event
+The pbinom function returns the probability (p) of a given quantity being observed in a binomial event. This is the power of the test that we are working with.
 
 ```{r easy_step2}
 pbinom(q = 8, # quantity (i.e. number of heads) we are interested in 
@@ -190,7 +190,10 @@ Lets see how we can simulate the power for a coin toss experiment with 158 tosse
 With the 
 
 ```{r power_sim_1}
-rbinom(1, 158, .6)
+rbinom(n = 1 # number of experiments that should be simulated
+       , size = 158 # tosses per simulated experiment
+       , prob = .6 # probability of gettings heads on each toss
+       )
 
 ```
 
@@ -234,13 +237,13 @@ crit_heads_simulated <- c(0) # a vector with the critical number of heads at our
 i <- 1 # an index that iterates over the loop
 check_power <- 0 # this is for the loop to see if the desired power is reached and stop if it is
 
-# while pwoer is < .80 run loop again
+# while power is < .80 run loop again
 while(check_power < .80){
   # frist we calculate the critical number of heads that occurs with p < alpha
   # at the coin toss experiment with n_tosses tosses
   crit_heads_simulated[i] <- qbinom(p = .05, size = n_tosses_simulated, prob = .50, lower.tail = FALSE)
   # calculate the proportion of sequences that result in more than crit_heads heads with the unfair coin
-  power_at_n[i] <- mean(rbinom(100, n_tosses_simulated, .6) > crit_heads_simulated[i])
+  power_at_n[i] <- mean(rbinom(n = 100, size = n_tosses_simulated, prob = .6) > crit_heads_simulated[i])
   check_power <- power_at_n[i] # save the check power for the loop
   # if power is still < .80
   if(check_power < .80){
