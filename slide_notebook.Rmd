@@ -265,8 +265,8 @@ set.seed(124)
 ```
 
 ```{r sim_groups_ttest}
-G1 <- rnorm(30, 0, 5)
-G2 <- rnorm(30, 2, 5)
+G1 <- rnorm(n = 30, mean = 0, sd = 5)
+G2 <- rnorm(n = 30, mean = 2, sd = 5)
 t.test(G1, G2, var.equal = TRUE)
 ```
 
